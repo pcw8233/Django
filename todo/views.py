@@ -23,4 +23,4 @@ def todo_info(request, todo_id):
         context = {'data': info}
         return render(request, 'todo_info.html', context)
     except Todo.DoesNotExist:
-        raise Http404("Todo does not exist")
+        raise Http404("Todo List가 존재하지 않습니다.")
