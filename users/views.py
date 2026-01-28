@@ -1,0 +1,24 @@
+from django.conf import settings
+from django.shortcuts import render, redirect
+from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
+from django.contrib.auth import login as django_login
+
+#회원가입
+def signup(request):
+    form = UserCreationForm(request.POST or None)
+    if form.is_valid():
+        form.save()
+        return redirect(settings.LOGIN_URL)
+
+    context = {'form': form}
+    return render(request, 'registration/signup.html', context)
+
+#로그인
+def login(request):
+    form = AuthenticationForm(request, data=request.POST or None)
+    if form.is_valid():
+        django_login(request, form.get_user())
+        return redirect(settings.LOGIN_REDIRECT_URL)
+
+    context = {'form': form}
+    return render(request, 'registration/login.html', context)
