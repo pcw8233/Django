@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'todo',
     'users', #users 앱을 추가
+    'django_extensions',
 ]
 
 MIDDLEWARE = [

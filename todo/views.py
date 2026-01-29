@@ -1,26 +1,80 @@
 # Views.py
 from django.http import Http404
-from django.shortcuts import render
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
+from django.db.models import Q
+from django.urls import reverse
+
+from todo.forms import TodoForm, TodoUpdateForm
 from todo.models import Todo
 
+@login_required()
 def todo_list(request):
-    todo_list = Todo.objects.all().values_list('id', 'title')
-    result = [{'id': todo[0], 'title': todo[1]} for i, todo in enumerate(todo_list)]
-    context = {'data': result}
-
+    todo_list = Todo.objects.filter(user=request.user).order_by('created_at')
+    q = request.GET.get('q') # GET 요청으로부터 q에 담긴 쿼리 파라미터를 가져온다.
+    if q:
+        # 만약 쿼리파라미터가 존재하면 todo_list에서 해당 쿼리파라미터로 filter를 걸어 조건에 맞는 Todo객체만 가져온다.
+        todo_list = todo_list.filter(Q(title__icontatins=q) | Q(description__icontatins=q))
+    paginator = Paginator(todo_list, 10) # 객체를 인스턴스화 한다.
+    page_number = request.GET.get('page') # GET 요청으로부터 page에 담긴 쿼리 파라미터 값을 가져온다.
+    page_obj = paginator.get_page(page_number) # 가져온 페이지 숫자를 이용해서 페이지에 대한 오브젝트를 가져온다.
+    context = {
+        'page_obj': page_obj
+    }
     return render(request, 'todo_list.html', context)
 
+@login_required()
 def todo_info(request, todo_id):
-    try:
-        todo = Todo.objects.get(id=todo_id)
-        info = {
-            'title': todo.title,
-            'description': todo.description,
-            'start_date': todo.start_date,
-            'end_date': todo.end_date,
-            'is_completed': todo.is_completed,
-        }
-        context = {'data': info}
-        return render(request, 'todo_info.html', context)
-    except Todo.DoesNotExist:
-        raise Http404("Todo List가 존재하지 않습니다.")
+    todo = get_object_or_404(Todo, id=todo_id)
+    context = {
+        'todo': todo.__dict__ # items 메서드를 사용하기 위해 딕셔너리 형태로 context를 념겨준다.
+    }
+    return render(request, 'todo_info.html', context)
+
+@login_required()
+def todo_create(request):
+    form = TodoForm(request.POST or None)
+    if form.is_valid():
+        # form으로부터 넘겨받은 데이터를 바탕으로 Todo 객체를 저장
+        # 데이터베이스에 저장하기전 user 정보를 추가하기위해 commit=False를 사용
+        todo = form.save(commit=False)
+        todo.user = request.user # Todo객체에 user정보를 추가
+        todo.save() # user정보가 추가된 Todo 객체를 데이터베이스에 저장
+        return redirect(reverse('todo_info', kwargs={'todo_id': todo.pk}))
+    context = {
+        'form': form
+    }
+    return render(request, 'todo_create.html', context)
+
+@login_required()
+def todo_update(request, todo_id):
+    todo = get_object_or_404(Todo, id=todo_id, user=request.user)
+    form = TodoUpdateForm(request.POST or None, instance=todo)
+    if form.is_valid():
+        form.save()
+        return redirect(reverse('todo_info', kwargs={'todo_id': todo.pk}))
+    context = {
+        'form': form
+    }
+    return render(request, 'todo_update.html', context)
+
+@login_required()
+def todo_delete(request, todo_id):
+    todo = get_object_or_404(Todo, id=todo_id, user=request.user)
+    todo.delete()
+    return redirect(reverse('todo_list'))
+
+    # try:
+    #     todo = Todo.objects.get(id=todo_id)
+    #     info = {
+    #         'title': todo.title,
+    #         'description': todo.description,
+    #         'start_date': todo.start_date,
+    #         'end_date': todo.end_date,
+    #         'is_completed': todo.is_completed,
+    #     }
+    #     context = {'data': info}
+    #     return render(request, 'todo_info.html', context)
+    # except Todo.DoesNotExist:
+    #     raise Http404("Todo List가 존재하지 않습니다.")
